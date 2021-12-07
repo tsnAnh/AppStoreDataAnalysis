@@ -1,0 +1,593 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+### Hazem Sayed
+### 20/07/2018
+Exploratory Data Analysis Nanodegree Project
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# 
+library(ggplot2)
+library(reshape2)
+library(GGally)
+library(plyr)
+library("tidyverse")
+library("gridExtra")
+library("memisc")
+library(dplyr)
+library(corrplot)
+
+
+```
+
+```{r echo=FALSE, Load_the_Data, message=FALSE, warning=FALSE}
+# Load the Data
+df <- read.csv('../AppleStore.csv')
+```
+
+# Introduction about the Data set!
+In this document we are going to explore the top trending apps in iOS app store.
+The dataset has more than 7000 Apple iOS mobile application details. 
+The data was extracted from the iTunes Search API at the Apple Inc website.
+
+# Univariate Plots Section
+
+```{r echo=FALSE,show.text=TRUE, Univariate_Plots, message=FALSE, warning=FALSE}
+# Showing summary about the data structures
+dim (df)
+str(df)
+
+# Adding a new variable to include size by MB.
+df$size_mb <- df$size_bytes/1024/1024
+
+# Showing frequency of apps in our data set sorted by their count.
+qplot(x=fct_infreq(df$prime_genre), data = df) +
+  labs (title="Frequncy of Apps based on the category",
+        x="Categories",y="Count") +
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+```
+
+From the above histogram, we see that the top app category in our data is Games.
+We can investigate better by deviding categories; Games, General App')
+
+Let's check a quick summary about free and paid apps
+
+```{r echo=FALSE,show.text=TRUE, Univariate_Plots2, message=FALSE, warning=FALSE}
+
+# Creating a new variable is_game to seperate General apps and Games.
+df$is_game <- df$prime_genre == 'Games'
+df$is_game <- ifelse(df$is_game == TRUE, "Game", "General App")
+
+# Showing summary about the price, also adding a new variable to seperate paid
+# and free apps.
+summary(df$price==0)
+df$is_free <- df$price == 0
+df$is_free <- ifelse(df$is_free == TRUE, "Free", "Paid")
+
+```
+
+Will be a good option to add a new feature to check if it's paid or a free app.
+
+* About 60% of our apps data are recorded for free applications, the rest is 
+paid.
+
+```{r echo=FALSE,show.text=TRUE, Univariate_Plots3, message=FALSE, warning=FALSE}
+# Showing frequency of apps in our data set based on app content category.
+qplot(x=cont_rating, data = df) +
+  labs (title="Frequncy of Apps based on the content type",
+        x="Content Type",y="Count") 
+```
+ 
+Most of our data focus on applications that are for +4 ages. 
+That makes a good  sense since we already have most of the data category 
+are games which are +4 age
+
+```{r echo=FALSE,show.text=TRUE, Univariate_Plots4, message=FALSE, warning=FALSE}
+# Showing frequncy of Apps based on the user rating above 0
+qplot(x=user_rating, data = subset(df,df$user_rating>0),binwidth = 1) + 
+labs (title="Frequncy of Apps based on the user rating above 0",
+      x="User Rating",y="Count") 
+
+#df <- subset(df,df$user_rating>0)
+```
+
+We excluded 0 rating from our apps to better investigate the dataset. 
+Most of apps are rated 4.5 and very few are rated as average 5.
+
+```{r echo=FALSE,show.text=TRUE, Univariate_Plots5, message=FALSE, warning=FALSE}
+
+# Create a new variable in our data set that include copy of the data 
+# after seperating Games and non-Games.
+dfGames <-subset(df,df$is_game == 'Game')
+dfGeneral <-subset(df,df$is_game != 'Game')
+
+# Showing top 10 Games based on user rating and total number of ratings
+print("Top 10 Games based on user rating and total number of ratings")
+head(dfGames[order(dfGames$user_rating,dfGames$rating_count_tot, decreasing= T),
+c("track_name","rating_count_tot")], n = 10,data = dfGames)
+
+# Showing top 10 General apps based on user rating and total number of ratings
+print("Top 10 General apps based on user rating and total number of ratings")
+head(dfGeneral[order(dfGeneral$user_rating,dfGeneral$rating_count_tot, 
+                     decreasing= T),c("track_name","rating_count_tot",
+                                      "prime_genre")], n = 10,data = dfGeneral)
+# This results are sorted based on user rating first and total ratings count.
+
+# Showing top 10 apps based on total count of user rating
+print("Top 10 apps based on total count of user rating")
+head(df[order(df$rating_count_tot, decreasing= T),
+        c("track_name","rating_count_tot")], n = 10,data = df)
+# This results are sorted based on user rating first and total ratings count.
+```
+
+# Univariate Analysis
+
+### Structure of the dataset:
+
+There are 7197 observation about apps in the US iOS app store in our dataset 
+with 16 features.
+Categorical Variables Are: prime_genre, currency, user_rating, cont_rating, 
+is_game.
+Numerical Variables Are: price, rating_count_tot, size_bytes, size_mb, 
+user_rating_ver, ver, rating_count_ver.
+
+The primary category for most of the observation are about Games, the rest are 
+for general apps.
+
+Price can be devided into Free or Paid.
+
+75% of apps are less than $2 in price and have average rating of 4.5
+- 
+
+### Main feature(s) of interest in the dataset?
+
+The main features of interest in our dataset are the app details like 
+price, and user rating.
+
+### Other features in the dataset I think will help support my \
+investigation into the feature(s) of interest?
+
+Lanugage Supported and size may be useful in future state to determine the 
+relation between ratings.
+
+All currencies in our dataset are USD. Which means no need to check any other 
+currency for this oarticular dataset.
+
+### What about creating new variables in the dataset?
+
+I created app_size by mb to better understand the size of the app and 
+how it relects to the user ratings. 
+I also created a variable of "Is free?" to better understand if the app is paid
+or free will reflect into the user ratings?
+I created a new variable is_game .. to cateorize application 
+based if it's a general app or a game.
+
+I subset the data to exclude data for 0 number ratings. It's not fair to 
+calculate zero ratings in our investigations.
+
+> **GGally**: Let's have an overview of all variables together, that should 
+give us a quick look to the relation between each variable and the rest of them.
+
+```{r echo=FALSE, ggpairs, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+ggpairs(df[,c('price','rating_count_tot',
+              'rating_count_ver','user_rating','user_rating_ver',
+              'size_mb','is_game','is_free',
+              'lang.num','sup_devices.num')]) + theme(axis.text.x=element_text(angle=90,hjust=1))
+```
+
+> **ggcorrplot**: A quick look to correlation between our numeric columns.
+
+```{r echo=FALSE, ggcorrplot, message=FALSE, warning=FALSE}
+M <-cor(select_if(df[,5:20], is.numeric))
+corrplot(M, method="circle")
+```
+
+# Bivariate Plots Section
+
+Is there a relation between the price of an app and it's mean user rating? 
+Let's deep onto our data set to answer this question ^^
+
+```{r echo=FALSE, Bivariate_Plots, message=FALSE, warning=FALSE,fig.width=8, fig.height=8}
+# A plotting point showing the relation between price of an app 
+# and it's mean user rating.
+ggplot(aes(x=user_rating,y=price), data = subset(df,price<50)) +
+geom_point() + xlim(c(1,5)) +
+labs (x="Average User Rating", y="Price",
+title="Not strong relation between price of an app and it's mean user rating.")+
+facet_wrap(~is_game) 
+```
+
+In the above plot, I included prices less than 50 to exclude some few 
+applications their prices over $100. As we see there are some outer points 
+in general apps for 4-5 ratings, which fairly indicates that 
+user rating/quality for a general app may be the reason for increasing the price. 
+This rarely could be happen (4% acuurancy).
+
+```{r echo=FALSE, Bivariate_Plots2, message=FALSE, warning=FALSE}
+# A plot line showing the relation between number of languages supported 
+        #by an app and it's quality/user rating.
+ggplot(aes(x=user_rating,y=lang.num), data = df) +
+  geom_line(stat = 'summary', fun.y = mean) +
+  labs (x="Average User Rating", y="Number of language supported",
+        title="The relation between number of languages supported 
+        by an app and it's quality/user rating")
+
+summary(df$lang.num)
+```
+
+Yes, number of lanuages supported by an app may affect on it's total rating. 
+We will check whether it affects on the price or not in a further analysis.
+
+75% of our data set have 8 language supported or less. 
+Most of them have only one language supported.
+
+```{r echo=FALSE, Bivariate_Plots10, message=FALSE, warning=FALSE}
+# Showing the relation between number of devices supported by an app and 
+        #it's quality/user rating
+ggplot(aes(y=user_rating,x=df$sup_devices.num), data = df) +
+  scale_x_continuous(limits=c(36,47),breaks = seq(36,47,1)) +
+  geom_line(stat = 'summary', fun.y = mean) + 
+  labs (y="Average User Rating", x="Number of devices supported",
+        title="The relation between number of devices supported by an app and 
+        it's quality/user rating")
+
+# Printing summary and coorelation between user rating and devices supported.
+summary(df$sup_devices.num)
+cor(df$user_rating,df$sup_devices.num)
+```
+
+The minumum number of supported devices is 9. Median is 37 
+
+75% of our data set have 39 language supported or less. Most of them have 37 
+devices supported.
+
+Correlation is negative 4/100.
+
+```{r echo=FALSE, Bivariate_Plots3, message=FALSE, warning=FALSE}
+# a boxlot plot for content rating as a categorical value and price for an app.
+ggplot(aes(x=cont_rating,y=price), data =subset(df,df$price>0)) +
+  ylim(0,25) +
+  geom_boxplot() 
+
+summary.factor(df$cont_rating,stats=TRUE)
+```
+
+All content based apps are nearly have 3 in user rating. 
+There are some slight diffferences but not that much to decide that the content 
+rating may affect on the user ratings! 
+
+* 25% of 12+ apps have prices less than $5, 
+* 9+ and 17+ are nearly the same in regarding of the price.
+* 4+ apps which include high number of games are less than $3.
+There are some ouliers for apps high than $7.
+
+
+Q: Which category has the most highgest rating?
+
+```{r echo=FALSE, Bivariate_Plots4, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# A histogram showing the relation between user ratings and an app category.
+ggplot(aes(x=prime_genre,y=user_rating,fill=prime_genre), data = df) +
+  geom_histogram(stat = 'summary', fun.y = mean) + coord_flip() +
+  labs (x="Categories", y="Average of user rating",
+        title="Does mean user ratings  depend on app category?") + 
+  facet_wrap(~is_free) + theme_minimal()
+
+```
+
+* Productivity and Music have the highest average rating in free apps.
+* Cataloges and Shopping have the highest average rating in paid apps.
+
+However,
+
+We see that books in paid apps have high mean rating, however very less in 
+free apps. The same in Catalogs.
+
+
+Q: Which category has the highgest total number of ratings?
+
+```{r echo=FALSE, Bivariate_Plots5, message=FALSE, warning=FALSE, fig.width=12, fig.height=12}
+# A histogram showing total number of user ratings and app category.
+ggplot(aes(x=prime_genre,y=rating_count_tot,fill=prime_genre), data = df) +
+  geom_bar(stat = 'summary', fun.y = mean) + coord_flip() +
+  labs (x="Categories", y="Average of total number of user rating",
+title="Does mean of total number of user ratings depend on app category?") + 
+  facet_wrap(~is_free) + scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) + theme_minimal()
+
+```
+
+WoW! The magic begins to appear!
+Users don't give feedback or rating to paid apps. However they do in free apps!
+
+
+Let's check if price may affect on app category?
+
+```{r echo=FALSE, Bivariate_Plots6, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# A histogram plot answering  question of 
+# Which category is more expensive than other apps?
+ggplot(aes(x=prime_genre,y=price,fill=prime_genre), data = df) +
+  geom_histogram(stat = 'summary', fun.y = mean) + coord_flip() + 
+  labs (x="Categories", y="Average Price",
+        title="Which category is more expensive than other apps?") + 
+  theme_minimal()
+```
+
+Someting strange, Medical category are the most expensive ones! 
+Yes the category field can affect on the price of the app!!
+Shopping apps have very less price than other apps
+
+```{r echo=FALSE, Bivariate_Plots7, message=FALSE, warning=FALSE}
+# line plot showing the relation between current version rating 
+# and average user rating for an app.
+ggplot(aes(x=user_rating_ver,y=user_rating), data = df) +
+  geom_line(stat = 'summary', fun.y = median) + geom_smooth() + 
+  labs (x="User rating of recent version", y="Total average user rating",
+        title="Does the current version is always have more rating than 
+        the total overall rating?")
+```
+
+Correlation between current version user rating and total 
+overall user rating is 0.7 which leads to a strong positive 
+correlation between them as the above plot shows.
+
+```{r echo=FALSE, Bivariate_Plots8, message=FALSE, warning=FALSE,fig.width=8, fig.height=8}
+# The relation between app size and price or user_rating
+ggplot(aes(x=price,y=size_mb), data = subset(df,df$price<25&&df$price>0)) +
+  geom_boxplot(alpha=1/10) + scale_x_continuous(limits = c(0,10),
+                                              breaks = seq(0,10,2)) + 
+  scale_y_continuous(limits = c(0,1000), breaks = seq(0,1000,100)) + 
+  facet_wrap(~is_game) + labs (x="Price", y="Size (MB)",
+          title="The relation between app size and price or user_rating")
+```
+
+* Most of paid games are less than $5.
+* For Games, price decreases when size of the app getting lower, 
+however in general apps there are no clear relation between them.
+
+```{r echo=FALSE, Bivariate_Plots9, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# A histogram showung the summary of size_mb (MEAN) and user rating.
+ggplot(aes(x=user_rating,y=size_mb), data = subset(df,df$user_rating>0)) +
+  geom_histogram(stat = 'summary', fun.y = mean) +
+  scale_x_continuous(breaks = seq(1.5,4.5,.5),limits = c(1,5))
+```
+
+yes! When app size increases, average user rating for the app increases as well.
+
+# Bivariate Analysis
+
+### What are the relationships I observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+* When we look to the relation between price and the total user ratings for an 
+app, we find that users rarely give high rating to expensive apps specially
+if it's a game. Most af apps ratings are for the apps that are less than USD 50.
+
+* Most of the apps in this dataset have prices less tan $5. 
+Let's have a closer look to prices based on content ratings in further analysis.
+
+* We see that books in paid apps have high mean rating, 
+However very less in free apps. The opposite in Catalogs. 
+That indicates that paid books apps worth the money paid. 
+They have good rating in paid apps rather than free ones.
+
+* Medical app category is the most expensive ones! 
+Yes the category field can affect on the price of the app!!
+* On the other side shopping and finance apps have less price than other apps.
+
+* Does the average user ratings may depend on the app content? 
+NO! All content based apps are nearly have 3 in user rating. 
+There are some slight diffferences  but not that much to decide that the content
+rating may affect on the user  ratings!
+
+
+### Some observation in the relationships between the other features \
+(not the main feature(s) of interest):
+
+* Number of supported languages not strongly affect on the average user rating. 
+The smooth line seems to be at the same level of usee rating (4).
+
+* It seems that the total rating always increases with new versions! 
+
+* What is the relation between app size and price or user_rating? 
+App size clearly does not affect on the price of the app. 
+Games are more stable in price even if the app size being increased. 
+
+* Is the the same regarding the relation between user rating and app size? NO! 
+Average user rating increases while app size increases! 
+It seems users give good rating for large sized apps!
+
+### What was the strongest relationship you found?
+Relation between user rating for the current version and total average of 
+user rating was the strongest relation among what we have found so far.
+
+# Multivariate Plots Section
+
+```{r echo=FALSE, Multivariate_Plots, message=FALSE, warning=FALSE,fig.width=8, fig.height=8}
+# Showing the relation between total count ratings, 
+  # price and user rating
+ggplot(aes(x=log10(rating_count_tot),y=price), data = subset(df,df$price<20&df$rating_count_tot),bandwidth= 1) +
+  geom_boxplot(aes(color = factor(user_rating))) + 
+  labs (y="Price", x="Log10 transformed total count of ratings ",title="The relation between total count ratings, price and user rating")
+
+print("Summary of total number of ratings /n")
+summary(log10(df$rating_count_tot))
+```
+
+* We can conclude from the plot above that most of good rated apps are cheap and
+they also have been rated with large number of users.
+
+```{r echo=FALSE, Multivariate_Plots2, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# Showing two plots for size and total number of ratings and price 
+# colored by user rating
+q1<- ggplot(aes(x=size_mb,y=price), data = subset(df,df$price<25)) +
+  geom_point(aes(color = factor(user_rating))) + coord_flip() + labs (y="Price", x="Size (MB)" )
+
+q2<- ggplot(aes(x=log10(rating_count_tot),y=price), 
+          data = subset(df,df$price<25))+geom_point(aes(color = factor(user_rating))) + 
+          labs (y="Price", x="Transformed log10 of total count of ratings " ) + coord_flip()
+
+grid.arrange(q1,q2,ncol=2)
+```
+
+* We see that prices under $10 their sizes vary, 
+their user rating stay good while sizes increase. 
+* Overall, average user rating remain good though the number 
+of total ratings increase.
+
+```{r echo=FALSE, Multivariate_Plots3, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# Relation between price and different category colored by user rating to define
+# which category has more price in comparing of user rating.
+ggplot(aes(x=prime_genre,y=price), data = df) +
+  geom_line(aes(color = factor(user_rating))) + 
+  theme(axis.text.x=element_text(angle=90,hjust=1)) +
+  labs(y="Price",x="Categories")
+```
+
+Utilities are expensive apps which have low user ratings.
+
+```{r echo=FALSE, Multivariate_Plots5, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# The relation and correlation between user rating and total number of ratings.
+ggplot(aes(x=prime_genre,y=log10(rating_count_tot)), data = df) +
+  geom_line(aes(color = factor(user_rating))) + 
+  labs(y="Total number of ratings",x="Categories") + 
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+print ("Correlation between user rating and total number of ratings")
+cor(df$rating_count_tot,df$user_rating)
+```
+
+* We see from the plot above that total rating count have a small effect on 
+the user rating for different categories.
+
+```{r echo=FALSE, warning=FALSE, Multivariate_Plots4, message=FALSE,fig.width=12, fig.height=12}
+ggplot(aes(x=rating_count_tot,y=user_rating), data = df) +
+  geom_point(aes(color = is_free)) + coord_flip()
+```
+
+# Multivariate Analysis
+
+Low prices apps are not good enough in general, the user rating increases in  
+most of category when the price increases; specially in Navigation, Education 
+and References apps. 
+
+* By plotting price and size of the app per MB show that apps have nearly price.
+i.e: $5, $10 or $15.
+* Low prices of Navigation apps are not good. 
+Moderate expensive music apps have good rating though.
+
+
+* Users love to give good rating when they notice the app already has a good
+rating. That's why while total number of rating increases, the average of 
+user_rating increases too.
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, Plot_One, message=FALSE, warning=FALSE}
+# Plotting final summary
+# Prices based on categories
+ggplot(aes(x=prime_genre,y=price), data = df) + 
+  geom_histogram(stat = 'summary', fun.y = mean) + coord_flip() + 
+  labs (x="Category", y="Price",title="Prices based on categories")
+
+# User rating based on categories
+ggplot(aes(x=prime_genre,y=user_rating), data = df) +
+  geom_histogram(stat = 'summary', fun.y = mean) + coord_flip() +
+  labs (x="Category", y="User Rating",title="User rating based on categories") +
+  facet_wrap(~is_free) 
+```
+
+### Description One
+* Medical app category is the most expensive ones, 
+may be because they provide valuable information?
+* The category field can affect on the price of the app!! 
+Shopping and finance apps have less price than other apps. Make sense because 
+they provide services and users already pay to use the service.
+
+### Plot Two
+```{r echo=FALSE, Plot_Two, message=FALSE, warning=FALSE}
+# line plot showing avg User rating vs Rating for recent version
+ggplot(aes(x=user_rating_ver,y=user_rating), data = df) + 
+  geom_line(stat = 'summary', fun.y = median) + geom_smooth() +
+  labs (x="User Rating for last version", y="Avg User Rating",
+        title="Avg User rating vs Rating for recent version") 
+```
+
+### Description Two
+Newer versions of most of the apps have better rating than the median rating. 
+Developers always try to publish a better app that worth a better rating always. 
+Correlation is 0.7 positive between twose two variables.
+
+### Plot Three
+```{r echo=FALSE, Plot_Three, message=FALSE, warning=FALSE,fig.width=12, fig.height=12}
+# points plot showing the relation between app price based on size
+ggplot(aes(x=size_mb,y=price), data = subset(df,df$user_rating>0)) +
+  geom_point(aes(color = factor(user_rating))) + coord_flip() + 
+  ylim(limits = c(0,10)) +
+  labs (x="Size (MB)", y="Price",title="App price based on size") 
+```
+
+### Description Three
+
+* What is the relation between user rating, price and app size? 
+Average user rating increases with good reviews while app size increases! 
+It seems users give good rating for large sized apps!
+
+* App size clearly does not affect on the price of the app. 
+Games are more  stable in price even if the app size being increased. 
+
+------
+
+# Reflection
+Our dataset has more than 7000 Apple iOS mobile application details. 
+The data was extracted from the iTunes Search API at the Apple Inc website.
+The main goal for investigating this data set is to predict if the app details    
+(i.e: price, content rating and size) affect on the average user rating for it?
+
+* Categories based on price?
+Medical category are the most expensive ones, the category field can affect on 
+the price of the app
+
+* Categories based on average user rating?
+1. Productivity and Music have the highest average rating in free apps.
+2. Cataloges and Shopping have the highest average rating in paid apps.
+3. Books in paid apps have high mean rating, however very less in 
+free apps. The same in Catalogs. Books paid app worth the money.
+
+* Top 3 apps based on total number of user ratings:
+1. Facebook (General App)
+2. Instagram (General App)
+3. Clash of Clans (Game)
+
+* Top 3 apps based on average user_rating:
+1. Domino's Pizza USA (General App)
+2. Flashlight (General App)
+3. Head Soccer (Game)
+4. Plants vs. Zombies (Game)
+
+> **For Future work**: Would it possible to predict success of an app by creating a model? 
+We may suppose that app which has more than 4 user_rating is succeful. 
+We may also think for a better approach to calculate the ration of a user rating based on total number of ratings count.
+
+```{r echo=FALSE, warning=FALSE, LM, message=FALSE, include=FALSE}
+# Creating a linear model to predict app price or user rating for an app.
+m1 <- lm(user_rating ~ price , data = df)
+m2 <- update(m1, ~ . + price)
+m3 <- update(m2, ~ . + prime_genre)
+m4 <- update(m3, ~ . + cont_rating)
+m5 <- update(m4, ~ . + size_mb)
+m6 <- update(m5, ~ . + lang.num)
+
+mtable(m1,m2,m3,m4,m5,m6,sdigits = 3)
+
+xx <- data.frame(prime_genre="Social Networking",
+                 user_rating=4,cont_rating="4+",size_mb=100,lang.num=2)
+yy <- predict (m6, newdata = xx, interval="prediction",level = .90)
+exp(yy)
+```
